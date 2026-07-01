@@ -134,7 +134,11 @@ class DiscordBot:
                     return
 
                 link = city.strip()
-                await interaction.response.defer(thinking=True)
+                try:
+                    await interaction.response.defer(thinking=True)
+                except Exception as _de:
+                    logger.warning(f"Defer failed ({_de}) — aborting")
+                    return
                 ana_ch = await get_or_create_channel(interaction.guild, Config.ANALYSIS_CHANNEL_NAME)
                 await interaction.followup.send(
                     f"🔍 **Analyzing:** `{link}`\n"
@@ -309,8 +313,12 @@ class DiscordBot:
             sample_captions="(Optional) Paste 2-3 existing captions from this profile separated by | for better AI results"
         )
         async def analyze_command(interaction: discord.Interaction, link: str, sample_captions: str = ""):
-            # defer() must be FIRST — Discord gives only 3 seconds before interaction expires
-            await interaction.response.defer(thinking=True)
+            # Wrap defer in try — high-latency servers can hit 10062 even on first call
+            try:
+                await interaction.response.defer(thinking=True)
+            except Exception as _de:
+                logger.warning(f"Defer failed ({_de}) — interaction may have expired, aborting")
+                return
             ana_ch = await get_or_create_channel(interaction.guild, Config.ANALYSIS_CHANNEL_NAME)
             await interaction.followup.send(f"🔍 **Analyzing:** `{link}`\nGenerating full report and 5 post templates...\nResults → {ana_ch.mention}")
 

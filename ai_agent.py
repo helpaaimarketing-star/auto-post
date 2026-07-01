@@ -353,45 +353,67 @@ BANNED: "Welcome to our world", "Behind the scenes", "Step into our journey", "W
 You MUST return the output as a valid JSON array of objects.
 {reference_instruction}
 
-For each post, select one of these File Types:
-- PNG: for text, vectors, graphics
-- JPEG: for Photos
-- MP4: for animated/video content
+=== PLATFORM-SPECIFIC CONTENT RULES (follow strictly) ===
+Instagram:
+- Caption: 2-4 punchy sentences, heavy emoji usage, conversational/hype tone
+- Always end with a clear CTA: "Shop now 👇", "DM us to order", "Save this for later 🔖"
+- Hashtags: mix of niche (#PakistaniFashion), product (#SummerDress), and reach (#OOTD #StyleInspo)
+- Content: visual storytelling — describe the FEELING of owning/using the product
 
-And select one of these Post Styles:
-- vector/illustration: flat designs, clean UI, no cartoons
-- minimalist/clean: simple design, clear background, premium brands
-- typography: beautiful fonts, quotes, alerts, announcement
-- infographics: step-by-step guides, facts, data designing
-- Photomontage / Manipulation: photo mixing, creating new scenes
-- Carousel (Multi-slide): 3-10 swiping slides of high value
-- 3D / AI Art: hyper-realistic 3D objects, premium aesthetic (NO cartoons)
+=== POST STYLE RULES ===
+Select one File Type per post:
+- PNG: text, vectors, graphics, infographics
+- JPEG: lifestyle photos, product shots, before/after
+- MP4: Reels, animations, carousels with motion
 
-CRITICAL RULES:
-1. NEVER use placeholders. Write the ACTUAL, realistic copy/text.
-2. The "caption" must be 100% complete, highly specific, engaging, matching the brand's voice.
-3. For 'typography', 'vector/illustration', or 'infographics': The "image_prompt" must include the EXACT text on the graphic.
-4. For 'Carousel (Multi-slide)': The "image_prompt" must write out EXACT text for each slide.
-5. NO CARTOONS, NO GENERIC TROPES. Every concept must be highly professional and commercial.
-6. Each post must feel like it belongs to THIS brand — not a generic template.
+Select one Post Style per post:
+- vector/illustration: flat premium design, modern UI, NO cartoons
+- minimalist/clean: premium aesthetic, lots of negative space, luxury feel
+- typography: bold text-based design — quote, announcement, offer, headline
+- infographics: tips list, step-by-step, comparison, stats — with EXACT slide text
+- Photomontage / Manipulation: product in lifestyle scene, cinematic poster
+- Carousel (Multi-slide): 3-8 swipeable slides — write EXACT text for every slide
+- 3D / AI Art: hyper-realistic 3D product render, premium commercial aesthetic
 
-Each object in the JSON array must have exactly these keys:
-- "style" (string: one of the 7 Post Styles listed above)
+=== ABSOLUTE RULES ===
+1. NEVER use placeholders like [Brand Name], [Product], [Price] — use REAL specific copy
+2. Captions must be 100% complete and ready-to-post — no editing needed
+3. For infographics/typography/carousel: image_prompt MUST include the EXACT text printed on the graphic, word for word
+4. ZERO generic phrases: no "Welcome to our world", "Behind the scenes of our journey", "We believe in quality"
+5. Every post must reference THIS specific brand's niche, product type, or audience — not a generic brand
+6. Vary the 5 posts: different styles, different content angles (product, offer, tips, testimonial, lifestyle)
+
+Each JSON object MUST have exactly these keys:
+- "style" (string: one of the 7 Post Styles)
 - "file_type" (string: PNG, JPEG, or MP4)
-- "caption" (string: Full ready-to-post caption with emojis, matching brand tone)
-- "hashtags" (string: 15-20 relevant hashtags)
-- "image_prompt" (string: Detailed visual description AND exact copy/text on the image/slides)
-- "best_time" (string: Suggested posting time)
-- "why_better" (string: 1-2 sentences explaining WHY this beats their current approach)
-- "expected_improvement" (string: e.g. '+40% engagement')"""
+- "caption" (string: full ready-to-post caption with emojis and CTA)
+- "hashtags" (string: 15-20 hashtags — niche + product + reach mix)
+- "image_prompt" (string: visual description + EXACT on-image text for graphics/carousels)
+- "best_time" (string: e.g. "Tuesday 7 PM PKT")
+- "why_better" (string: 1-2 sentences — what specific weakness this fixes)
+- "expected_improvement" (string: e.g. "+35% saves, +20% DMs")"""
 
-        user = f"""Business: {business_name}
-Niche: {niche}
-Platform: {platform}
-Current Problems: {", ".join(weak_points) if weak_points else 'Low engagement'}
+        # Build a rich brand context block
+        brand_context = f"""BRAND: {business_name}
+NICHE: {niche}
+PLATFORM: {platform}
 {context_str}
+WEAK POINTS TO FIX: {", ".join(weak_points) if weak_points else "Low engagement, generic content, no CTA"}
+{("TRENDING NOW: " + trending_info) if trending_info else ""}"""
 
-Generate {count} different post templates. Use a variety of File Types and Post Styles (do not repeat the same style/file type). Each post must feel authentic to THIS brand based on their existing content style.{(" Use these trending topics as inspiration where relevant: " + trending_info) if trending_info else ""}"""
+        user = f"""{brand_context}
+
+TASK: Generate {count} Instagram post templates for THIS specific brand.
+
+Requirements:
+- Every caption must mention something SPECIFIC to this brand (their product type, niche, audience)
+- Use the weak points above to make each post directly solve a real problem
+- Posts must feel like they came from a real social media manager for THIS brand
+- Vary content angles: try product showcase, limited offer, customer result, tips/value, lifestyle
+- Use variety of styles and file types (no two posts same style)
+- For Pakistani/Asian fashion brands: mention fabric names, occasion wear, local events (Eid, wedding season) if relevant
+
+Return ONLY a valid JSON array. No markdown, no explanation."""
 
         plat_lower = platform.lower()
         if plat_lower in ["linkedin", "b2b", "threads"]:

@@ -344,7 +344,34 @@ class DiscordBot:
                     await asyncio.sleep(0.3)
                     
                 analysis_emb, post_embeds, template_codes = build_post_template_embeds(post_data)
-                await send_post_embeds_with_images(ana_ch, analysis_emb, post_embeds, post_data, template_codes, b_name, detected_niche)
+                if analysis_emb:
+                    await ana_ch.send(embed=analysis_emb)
+                for idx, emb in enumerate(post_embeds):
+                    code = template_codes[idx] if idx < len(template_codes) else "0000"
+                    tpl = post_data.get("templates", [])[idx] if idx < len(post_data.get("templates", [])) else {}
+                    view = TemplateDownloadView(
+                        template_data=tpl,
+                        template_code=code,
+                        business_name=b_name,
+                        niche=detected_niche,
+                    )
+                    msg = await ana_ch.send(embed=emb, view=view)
+                    await asyncio.sleep(0.3)
+                    image_url = tpl.get("generated_image_url", "")
+                    if image_url:
+                        try:
+                            import aiohttp, io as _io
+                            async with aiohttp.ClientSession() as _sess:
+                                async with _sess.get(image_url, timeout=aiohttp.ClientTimeout(total=90)) as _r:
+                                    if _r.status == 200:
+                                        _data = await _r.read()
+                                        _ext = "jpg" if tpl.get("file_type","PNG").upper()=="JPEG" else "png"
+                                        _fname = f"template_{idx+1}_{code}.{_ext}"
+                                        _new_emb = emb.copy()
+                                        _new_emb.set_image(url=f"attachment://{_fname}")
+                                        await msg.edit(embed=_new_emb, attachments=[discord.File(fp=_io.BytesIO(_data), filename=_fname)])
+                        except Exception as _e:
+                            logger.warning(f"Image update failed for template {idx+1}: {_e}")
 
                 # 4. Action Buttons with full data
                 view = AnalysisActionView(

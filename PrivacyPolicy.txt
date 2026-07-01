@@ -1,0 +1,23 @@
+SMMA Bot System — Privacy Policy
+
+This bot processes business lead data from public sources (Google Maps, social media profiles)
+for social media marketing outreach purposes.
+
+Data Collected:
+- Business names, locations, websites, phone numbers (publicly available)
+- Social media profile URLs and activity estimates
+- Client deal information entered manually via Discord commands
+- Email logs for outreach tracking
+
+Data Storage:
+- Airtable (cloud database) for lead and deal records
+- Local event logs in the event_log/ directory
+
+Data Sharing:
+- Outreach emails are sent directly to business contacts
+- No data is sold to third parties
+
+Contact:
+Configure your agency contact details in the Discord server settings.
+
+Last updated: June 2026

@@ -33,7 +33,6 @@ def build_lead_embed(lead: dict, index: int, total: int, ai: AIAgent) -> discord
     embed.add_field(name="📍 Location", value=loc_display, inline=True)
     embed.add_field(name="🏷️ Niche", value=lead["niche"], inline=True)
     embed.add_field(name="⚡ Weakness Score", value=f"{score}/10", inline=True)
-
     if lead.get("website"):
         embed.add_field(name="🌐 Website", value=lead["website"], inline=False)
     if lead.get("email"):
@@ -42,7 +41,6 @@ def build_lead_embed(lead: dict, index: int, total: int, ai: AIAgent) -> discord
         embed.add_field(name="📞 Phone/WA", value=lead["phone"], inline=True)
     if lead.get("snippet"):
         embed.add_field(name="📝 About", value=lead["snippet"][:300], inline=False)
-
     profiles = lead.get("profiles", {})
     followers = lead.get("followers", {})
     if profiles:
@@ -52,16 +50,13 @@ def build_lead_embed(lead: dict, index: int, total: int, ai: AIAgent) -> discord
             fol_str = f" ({fol:,} followers)" if fol else ""
             prof_lines.append(f"• {k.capitalize()}{fol_str}: {v}")
         embed.add_field(name="🔗 Social Profiles Found", value="\n".join(prof_lines), inline=False)
-
     weak_text = "\n".join(f"• {w}" for w in lead.get("weak_points", [])[:5])
     if weak_text:
         embed.add_field(name="❌ Problems Detected", value=weak_text, inline=False)
-
     hooks = lead.get("sale_hooks", [])
     if hooks:
         hooks_text = "\n".join(f"💡 {h}" for h in hooks[:3])
         embed.add_field(name="💰 What to Sell Them", value=hooks_text, inline=False)
-
     pricing = ai.suggest_pricing(lead["niche"], lead.get("weak_points", []), country_val or "United States")
     embed.add_field(
         name="💵 Suggested Price",
@@ -144,7 +139,6 @@ class LeadActionView(discord.ui.View):
         profiles = lead.get("profiles", {})
         biz_email = lead.get("email", "")
         pricing = self.ai.suggest_pricing(niche, weak_points, country)
-
         if biz_email:
             await interaction.followup.send(f"⚙️ **{name}** ke liye email generate ho rahi hai…", ephemeral=True)
             email_data = await asyncio.to_thread(self.ai.generate_cold_email, name, niche, city, country, weak_points, website, pricing)
@@ -252,7 +246,6 @@ def build_analysis_embeds(analysis: dict) -> list[discord.Embed]:
     overview.add_field(name="Tech Stack", value=", ".join(analysis.get('tech_stack')) if analysis.get('tech_stack') else "None detected", inline=False)
     overview.add_field(name="🔥 Weakness Score", value=f"{score}/10", inline=False)
     embeds.append(overview)
-
     socials = discord.Embed(title="📱 Profiles & Contact Info", color=0x3498DB)
     prof_text = ""
     for k, v in analysis.get("social_profiles", {}).items():
@@ -264,7 +257,6 @@ def build_analysis_embeds(analysis: dict) -> list[discord.Embed]:
     socials.add_field(name="📞 Phones", value="\n".join(contacts.get("phones", [])) or "❌ None", inline=True)
     socials.add_field(name="💬 WhatsApp", value="\n".join(contacts.get("whatsapp", [])) or "❌ None", inline=True)
     embeds.append(socials)
-
     problems = discord.Embed(title="⚠️ Issues & Weak Points Detected", color=0xE74C3C)
     probs = analysis.get("problems", [])
     problems.description = "\n".join(f"❌ {p}" for p in probs) if probs else "✅ No major issues detected!"
@@ -279,29 +271,24 @@ def build_post_template_embeds(post_data: dict) -> tuple[discord.Embed | None, l
     embeds = []
     codes = []
     analysis_emb = None
-
     reasoning = post_data.get("post_analysis", "")
     if reasoning:
         analysis_emb = discord.Embed(title="🧠 Why Current Posts Aren't Working", description=reasoning, color=0x9B59B6)
-
     for i, tpl in enumerate(post_data.get("templates", [])):
         style = tpl.get('style', 'Post')
         file_type = tpl.get('file_type', 'PNG')
         code = ''.join(random.choices(string.digits, k=4))
         codes.append(code)
-
         emb = discord.Embed(title=f"📌 Template {i+1}: {style.upper()}", color=0xF1C40F)
         emb.add_field(name="🆔 Approval Code", value=f"**`{code}`**", inline=True)
         emb.add_field(name="📁 File Type", value=f"`{file_type}`", inline=True)
         emb.add_field(name="🎨 Post Style", value=f"`{style}`", inline=True)
-
         cap = tpl.get('caption', '')
         if len(cap) > 1024:
             cap = cap[:1021] + "..."
         emb.add_field(name="📝 Caption", value=f"```{cap}```", inline=False)
         emb.add_field(name="#️⃣ Hashtags", value=tpl.get('hashtags', ''), inline=False)
         emb.add_field(name="🖼️ Visual Prompt", value=tpl.get('image_prompt', ''), inline=False)
-
         img_prompt = tpl.get('image_prompt', '')
         if img_prompt:
             style_lower = style.lower()
@@ -319,20 +306,17 @@ def build_post_template_embeds(post_data: dict) -> tuple[discord.Embed | None, l
                 modifier = "hyper-realistic photo manipulation, cinematic poster, dramatic lighting, high-end photoshop, 8k"
             else:
                 modifier = "hyper-realistic, high-end commercial photography, professional marketing asset, photorealistic, DSLR, 8k"
-
             clean_prompt = f"{modifier}. {img_prompt}"
             encoded = urllib.parse.quote(clean_prompt)
             seed = random.randint(1, 1000000)
             image_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true&private=true&seed={seed}"
             tpl['generated_image_url'] = image_url
             emb.set_image(url=image_url)
-
         emb.add_field(name="💡 Why This Is Better", value=tpl.get('why_better', ''), inline=False)
         emb.add_field(name="📈 Expected Impact", value=tpl.get('expected_improvement', ''), inline=True)
         emb.add_field(name="⏰ Best Time", value=tpl.get('best_time', ''), inline=True)
         emb.set_footer(text=f"Client Approval Code: {code} | Share this with your client to approve this template")
         embeds.append(emb)
-
     return analysis_emb, embeds, codes
 
 
@@ -355,7 +339,6 @@ class TemplateDownloadView(discord.ui.View):
             file_type = 'png'
         if file_type == 'mp4':
             file_type = 'png'
-
         image_url = tpl.get('generated_image_url')
         import aiohttp
         import io as _io
@@ -371,7 +354,6 @@ class TemplateDownloadView(discord.ui.View):
         if not file_bytes:
             file_bytes = _io.BytesIO(b"Media generation failed.")
             file_type = "txt"
-
         filename = f"{self.business_name.replace(' ', '_')[:15]}_{style.replace('/', '_')[:10]}_{self.template_code}.{file_type}"
         discord_file = discord.File(fp=file_bytes, filename=filename)
         msg_content = (

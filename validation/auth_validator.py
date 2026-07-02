@@ -1,14 +1,9 @@
 """Authentication and authorization validation."""
-
 import logging
 from config import Config
-
 logger = logging.getLogger("AuthValidator")
-
-
 class AuthValidator:
     """Validates system credentials and optional orchestrator secret."""
-
     @staticmethod
     def validate_config() -> bool:
         required = {
@@ -31,7 +26,6 @@ class AuthValidator:
             
         logger.info("All configs loaded successfully.")
         return True
-
     @staticmethod
     def verify_orchestrator_secret(provided: str) -> bool:
         if not Config.ORCHESTRATOR_SECRET:

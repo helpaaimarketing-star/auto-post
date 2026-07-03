@@ -1,4 +1,5 @@
 """SMMA Bot System — Central Discord Controller & Slash Command Handler."""
+
 import io
 import os
 import asyncio
@@ -6,9 +7,11 @@ import logging
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional
+
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+
 from config import Config
 from airtable_client import AirtableClient
 from utils.helper import get_or_create_channel
@@ -27,26 +30,36 @@ from processing.link_analyzer import LinkAnalyzer
 from processing.post_generator import PostGenerator
 from views import LeadActionView, build_lead_embed, build_analysis_embeds, build_post_template_embeds, AnalysisActionView, TemplateDownloadView, load_template_cache, BuildPostActionView
 from output.post_processor import build_post_text_file, format_post_embed_fields, build_analysis_report_text_file, build_template_package_text_file
+
 logger = logging.getLogger("SMMABot")
+
+
 class _HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.end_headers()
         self.wfile.write(b"SMMA Bot OK")
+
     def log_message(self, *_):
         pass
+
+
 def start_health_server():
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(("0.0.0.0", port), _HealthHandler)
     logger.info(f"Health server on port {port}")
     server.serve_forever()
+
+
 class DiscordBot:
     """Manages Discord bot events, commands, and initialization."""
+
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.guilds = True
+
         self.bot = commands.Bot(command_prefix="!", intents=intents)
         self.db = AirtableClient()
         self.ai = AIAgent()
@@ -56,8 +69,10 @@ class DiscordBot:
         self.followups = FollowUpManager()
         self._register_events()
         self._register_commands()
+
     def _register_events(self):
         bot = self.bot
+
         @bot.event
         async def on_ready():
             logger.info(f"SMMA Bot online: {bot.user.name} ({bot.user.id})")
@@ -76,15 +91,20 @@ class DiscordBot:
                 logger.info(f"Synced {len(synced)} slash commands: {[c.name for c in synced]}")
             except Exception as e:
                 logger.error(f"Command sync failed: {e}")
+
         @tasks.loop(minutes=30)
         async def heartbeat():
             logger.info(f"Heartbeat — alive | Guilds: {len(bot.guilds)}")
+
         @heartbeat.before_loop
         async def before_heartbeat():
             await bot.wait_until_ready()
+
         self.heartbeat = heartbeat
+
     def _register_commands(self):
         bot = self.bot
+
         @bot.tree.command(name="scrape", description="Global social media leads dhundho (Influencers, Startups, E-com)")
         @app_commands.describe(
             niche="Business category (e.g. Clothing, Fitness, SaaS)",
@@ -112,6 +132,7 @@ class DiscordBot:
                         "Phir dobara `/scrape` chalao with niche = 🔗 Link Analyze",
                         ephemeral=True)
                     return
+
                 link = city.strip()
                 await interaction.response.defer()
                 ana_ch = await get_or_create_channel(interaction.guild, Config.ANALYSIS_CHANNEL_NAME)
@@ -119,21 +140,27 @@ class DiscordBot:
                     f"🔍 **Analyzing:** `{link}`\n"
                     f"Full report + 5 post templates generate ho rahi hain...\n"
                     f"Results → {ana_ch.mention}")
+
                 try:
                     analyzer = LinkAnalyzer()
                     analysis_data = await asyncio.to_thread(analyzer.analyze, link)
+
                     text_for_niche = f"{analysis_data.get('title', '')} {analysis_data.get('description', '')}"
                     detected_niche = await asyncio.to_thread(self.ai.detect_niche, text_for_niche, link)
                     b_name = analysis_data.get("title") or link.split("://")[-1].split("/")[0]
+
                     generator = PostGenerator(self.ai)
                     post_data = await asyncio.to_thread(generator.generate_templates, analysis_data, b_name, detected_niche)
+
                     ana_embeds = build_analysis_embeds(analysis_data)
                     for emb in ana_embeds:
                         await ana_ch.send(embed=emb)
                         await asyncio.sleep(0.3)
+
                     analysis_emb, post_embeds, template_codes = build_post_template_embeds(post_data, b_name, detected_niche)
                     if analysis_emb:
                         await ana_ch.send(embed=analysis_emb)
+
                     for idx, emb in enumerate(post_embeds):
                         code = template_codes[idx] if idx < len(template_codes) else "0000"
                         tview = TemplateDownloadView(
@@ -144,6 +171,7 @@ class DiscordBot:
                         )
                         await ana_ch.send(embed=emb, view=tview)
                         await asyncio.sleep(0.3)
+
                     view = AnalysisActionView(
                         target_url=link,
                         business_name=b_name,
@@ -154,6 +182,7 @@ class DiscordBot:
                         deals=self.deals
                     )
                     await ana_ch.send("Take action on this report:", view=view)
+
                     # Send downloadable report text file
                     report_text = build_analysis_report_text_file(analysis_data, post_data, b_name, detected_niche)
                     file_bytes = io.BytesIO(report_text.encode("utf-8"))
@@ -170,11 +199,13 @@ class DiscordBot:
                     
                     discord_file_analysis = discord.File(fp=io.BytesIO(report_text.encode("utf-8")), filename=filename)
                     await ana_ch.send(embed=dl_embed, file=discord_file_analysis)
+
                 except Exception as e:
                     logger.exception("Link Analyze failed")
                     await interaction.followup.send(f"❌ Analyze fail: `{e}`")
                 return
             # ── Normal Scrape Mode ────────────────────────────────────
+
             c_str = city.strip() if city else ""
             co_str = country.strip() if country else ""
             loc_str = f"{c_str}, {co_str}".strip(", ") if c_str or co_str else "Worldwide"
@@ -185,10 +216,12 @@ class DiscordBot:
             if not ok:
                 await interaction.response.send_message(f"❌ {err}", ephemeral=True)
                 return
+
             await interaction.response.defer()
             leads_ch = await get_or_create_channel(interaction.guild, Config.LEADS_CHANNEL_NAME)
             await interaction.followup.send(
                 f"🔍 **Scraping shuru!**\n`{niche}` | {loc_str}\nResults → {leads_ch.mention}")
+
             try:
                 leads = await asyncio.to_thread(
                     self.processor.scrape_leads,
@@ -197,9 +230,11 @@ class DiscordBot:
             except Exception as e:
                 await interaction.followup.send(f"❌ Scraping fail: `{e}`")
                 return
+
             if not leads:
                 await leads_ch.send(f"⚠️ `{niche}` ke liye koi weak lead nahi mila — {loc_str}.")
                 return
+
             await leads_ch.send(f"✅ **{len(leads)} weak leads mile** | `{niche}` | {loc_str}")
             for i, lead in enumerate(leads, 1):
                 embed = build_lead_embed(lead, i, len(leads), self.ai)
@@ -207,6 +242,7 @@ class DiscordBot:
                                       db=self.db, ai=self.ai, deals=self.deals)
                 await leads_ch.send(embed=embed, view=view)
                 await asyncio.sleep(0.6)
+
         @bot.tree.command(name="scan", description="Global scan: dropdowns ke sath influencers/startups dhundho")
         @app_commands.describe(
             niche="Business category (e.g. Clothing, Fitness, SaaS)",
@@ -235,10 +271,12 @@ class DiscordBot:
             if not ok:
                 await interaction.response.send_message(f"❌ {err}", ephemeral=True)
                 return
+
             await interaction.response.defer()
             leads_ch = await get_or_create_channel(interaction.guild, Config.LEADS_CHANNEL_NAME)
             await interaction.followup.send(
                 f"🔍 **Scan shuru!** `{niche}` | {loc_str}\nResults → {leads_ch.mention}")
+
             try:
                 leads = await asyncio.to_thread(
                     self.processor.scrape_leads,
@@ -247,9 +285,11 @@ class DiscordBot:
             except Exception as e:
                 await interaction.followup.send(f"❌ Scan fail: `{e}`")
                 return
+
             if not leads:
                 await leads_ch.send(f"⚠️ `{niche}` ke liye koi weak lead nahi mila — {loc_str}.")
                 return
+
             await leads_ch.send(f"✅ **{len(leads)} weak leads mile** | `{niche}` | {loc_str}")
             for i, lead in enumerate(leads, 1):
                 embed = build_lead_embed(lead, i, len(leads), self.ai)
@@ -257,6 +297,7 @@ class DiscordBot:
                                       db=self.db, ai=self.ai, deals=self.deals)
                 await leads_ch.send(embed=embed, view=view)
                 await asyncio.sleep(0.6)
+
         @bot.tree.command(name="analyze", description="Analyze any social profile or website and generate 5 post templates")
         @app_commands.describe(
             link="Website or Social Media URL (e.g. instagram.com/nike)"
@@ -265,6 +306,7 @@ class DiscordBot:
             await interaction.response.defer()
             ana_ch = await get_or_create_channel(interaction.guild, Config.ANALYSIS_CHANNEL_NAME)
             await interaction.followup.send(f"🔍 **Analyzing:** `{link}`\nGenerating full report and 5 post templates...\nResults → {ana_ch.mention}")
+
             try:
                 # 1. Analyze Link
                 analyzer = LinkAnalyzer()
@@ -274,11 +316,14 @@ class DiscordBot:
                 text_for_niche = f"{analysis_data.get('title', '')} {analysis_data.get('description', '')}"
                 detected_niche = await asyncio.to_thread(self.ai.detect_niche, text_for_niche, link)
                 logger.info(f"Auto-detected niche: {detected_niche}")
+
                 # Use title from analysis or domain from URL as business name
                 b_name = analysis_data.get("title") or link.split("://")[-1].split("/")[0]
+
                 # 2. Generate Post Templates
                 generator = PostGenerator(self.ai)
                 post_data = await asyncio.to_thread(generator.generate_templates, analysis_data, b_name, detected_niche)
+
                 # 3. Send Embeds to Analysis Channel
                 ana_embeds = build_analysis_embeds(analysis_data)
                 for emb in ana_embeds:
@@ -288,6 +333,7 @@ class DiscordBot:
                 analysis_emb, post_embeds, template_codes = build_post_template_embeds(post_data, b_name, detected_niche)
                 if analysis_emb:
                     await ana_ch.send(embed=analysis_emb)
+
                 for idx, emb in enumerate(post_embeds):
                     code = template_codes[idx] if idx < len(template_codes) else "0000"
                     view = TemplateDownloadView(
@@ -331,6 +377,7 @@ class DiscordBot:
             except Exception as e:
                 logger.exception("Analyze command failed")
                 await interaction.followup.send(f"❌ Analyze fail: `{e}`")
+
         @bot.tree.command(name="dc", description="Deal close karo aur Order ID generate karo")
         @app_commands.describe(
             business="Client ka business name",
@@ -356,6 +403,7 @@ class DiscordBot:
             if not ok:
                 await interaction.response.send_message(f"❌ {err}", ephemeral=True)
                 return
+
             await interaction.response.defer()
             deals_ch = await get_or_create_channel(interaction.guild, Config.DEALS_CHANNEL_NAME)
             order_id = self.deals.close_deal(
@@ -372,6 +420,7 @@ class DiscordBot:
                 raw["business"], raw["niche"], "deal_close", "won",
                 10, f"{raw['package']} at ${raw['price']}/mo",
             )
+
             embed = discord.Embed(title="🎉 Deal Close!", color=0x2ECC71)
             embed.add_field(name="🆔 Order ID", value=f"`{order_id}`", inline=False)
             embed.add_field(name="🏢 Business", value=business, inline=True)
@@ -385,6 +434,7 @@ class DiscordBot:
             embed.set_footer(text="Congratulations! 🚀")
             await deals_ch.send(embed=embed)
             await interaction.followup.send(f"✅ Deal close! Order ID: `{order_id}`\n→ {deals_ch.mention}")
+
         @bot.tree.command(name="build", description="Client ke liye AI social media post banao + download")
         @app_commands.describe(
             order_id="Order ID — /dc ke baad mila tha",
@@ -411,9 +461,11 @@ class DiscordBot:
             if not ok:
                 await interaction.response.send_message(f"❌ {err}", ephemeral=True)
                 return
+
             await interaction.response.defer()
             builds_ch = await get_or_create_channel(interaction.guild, Config.BUILDS_CHANNEL_NAME)
             downloads_ch = await get_or_create_channel(interaction.guild, Config.DOWNLOADS_CHANNEL_NAME)
+
             try:
                 records = self.db.fetch_all("Deals", formula=f"{{OrderID}}='{order_id}'")
                 if not records:
@@ -423,9 +475,11 @@ class DiscordBot:
             except Exception as e:
                 await interaction.followup.send(f"❌ Airtable error: `{e}`")
                 return
+
             business = deal.get("BusinessName", "")
             niche = deal.get("Niche", "")
             city = deal.get("City", "")
+
             # If template code is provided, fetch it from cache
             cached_tpl = None
             if template_code:
@@ -437,9 +491,12 @@ class DiscordBot:
                 # Use cached business/niche names if available
                 business = cached_tpl.get("business_name") or business
                 niche = cached_tpl.get("niche") or niche
+
             await interaction.followup.send(f"⚙️ **{business}** ke liye {platform} post(s) ban rahi hain…")
+
             import urllib.parse
             import random
+
             if cached_tpl:
                 # Generate count posts from the approved template style
                 posts = await asyncio.to_thread(
@@ -469,13 +526,16 @@ class DiscordBot:
                             modifier = "hyper-realistic photo manipulation, cinematic poster, dramatic lighting, high-end photoshop, 8k"
                         else:
                             modifier = "hyper-realistic, high-end commercial photography, professional marketing asset, photorealistic, DSLR, 8k"
+
                         clean_prompt = f"{modifier}. {img_prompt}"
                         encoded = urllib.parse.quote(clean_prompt)
                         seed = random.randint(1, 1000000)
                         image_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true&private=true&seed={seed}"
                         post["generated_image_url"] = image_url
+
                     # Save each built post to Airtable
                     self.deals.save_build(order_id, business, niche, platform, post)
+
                     # Send preview embed
                     fields = format_post_embed_fields(post)
                     embed = discord.Embed(title=f"📱 Post Ready ({idx+1}/{len(posts)}): {business}", color=0x9B59B6)
@@ -491,12 +551,14 @@ class DiscordBot:
                     bview = BuildPostActionView(post, business, niche, platform, order_id)
                     await builds_ch.send(embed=embed, view=bview)
                     await asyncio.sleep(0.3)
+
                 # Record outcome
                 await asyncio.to_thread(
                     self.learner.record_outcome,
                     business, niche, "post_build_template", f"template_{template_code}_count_{count}",
                     8, f"Built {count} posts from template {template_code} for {order_id}"
                 )
+
                 # Send downloadable bulk text package
                 file_content = build_template_package_text_file(posts, business, niche, order_id, platform, template_code)
                 filename = f"Bulk_{template_code}_{order_id}_{platform}_{business.replace(' ', '_')[:15]}.txt"
@@ -512,6 +574,7 @@ class DiscordBot:
                     7, f"{platform} build for {order_id}",
                 )
                 fields = format_post_embed_fields(post_data)
+
                 embed = discord.Embed(title=f"📱 Post Ready: {business}", color=0x9B59B6)
                 embed.add_field(name="🆔 Order ID", value=f"`{order_id}`", inline=True)
                 embed.add_field(name="📲 Platform", value=platform.capitalize(), inline=True)
@@ -536,10 +599,13 @@ class DiscordBot:
                 
                 bview = BuildPostActionView(post_data, business, niche, platform, order_id)
                 await builds_ch.send(embed=embed, view=bview)
+
                 file_content = build_post_text_file(post_data, business, niche, order_id, platform)
                 filename = f"{order_id}_{platform}_{business.replace(' ', '_')[:20]}.txt"
+
             file_bytes = io.BytesIO(file_content.encode("utf-8"))
             discord_file = discord.File(fp=file_bytes, filename=filename)
+
             dl_embed = discord.Embed(
                 title=f"📥 Download: {business} — {platform.capitalize()}",
                 description=f"**Order:** `{order_id}`\n**Platform:** {platform.capitalize()}\n\n"
@@ -549,6 +615,7 @@ class DiscordBot:
             await downloads_ch.send(embed=dl_embed, file=discord_file)
             await interaction.followup.send(
                 f"✅ Post(s) ready!\nPreview → {builds_ch.mention}\n📥 Download → {downloads_ch.mention}")
+
         @bot.tree.command(name="followup", description="Interest tracking aur follow-up schedule karo")
         @app_commands.describe(
             business="Business/client name",
@@ -585,6 +652,7 @@ class DiscordBot:
                 await interaction.response.send_message(
                     "ERROR: due_days 0 se 30 ke beech hona chahiye.", ephemeral=True)
                 return
+
             await interaction.response.defer(ephemeral=True)
             saved = await asyncio.to_thread(
                 self.followups.create_followup,
@@ -603,12 +671,17 @@ class DiscordBot:
             else:
                 await interaction.followup.send(
                     "Follow-up save failed. Airtable `Follow-ups` table/fields check karein.")
+
     def run(self):
         threading.Thread(target=start_health_server, daemon=True).start()
         self.bot.run(Config.DISCORD_BOT_TOKEN, reconnect=True, log_handler=None)
+
+
 def main():
     """Start the Discord bot."""
     bot_inst = DiscordBot()
     bot_inst.run()
+
+
 if __name__ == "__main__":
     main()
